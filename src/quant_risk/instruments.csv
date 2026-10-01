@@ -1,0 +1,36 @@
+symbol,name,exchange,currency,multiplier,price_unit,asset_class,sector
+ES,E-mini S&P 500,CME,USD,50,index points,equity,us_equity_index
+NQ,E-mini Nasdaq-100,CME,USD,20,index points,equity,us_equity_index
+RTY,E-mini Russell 2000,CME,USD,50,index points,equity,us_equity_index
+YM,E-mini Dow ($5),CBOT,USD,5,index points,equity,us_equity_index
+FDAX,DAX,EUREX,EUR,25,index points,equity,eu_equity_index
+FESX,Euro Stoxx 50,EUREX,EUR,10,index points,equity,eu_equity_index
+TY,10-Year US Treasury Note,CBOT,USD,1000,% of par,rates,us_rates
+US,30-Year US Treasury Bond,CBOT,USD,1000,% of par,rates,us_rates
+FGBL,Euro-Bund,EUREX,EUR,1000,% of par,rates,eu_rates
+EC,Euro FX,CME,USD,125000,USD per EUR,fx,fx
+BP,British Pound,CME,USD,62500,USD per GBP,fx,fx
+JY,Japanese Yen,CME,USD,125000,USD per 100 JPY,fx,fx
+SF,Swiss Franc,CME,USD,125000,USD per CHF,fx,fx
+AD,Australian Dollar,CME,USD,100000,USD per AUD,fx,fx
+CD,Canadian Dollar,CME,USD,100000,USD per CAD,fx,fx
+NE1,New Zealand Dollar,CME,USD,100000,USD per NZD,fx,fx
+CL,WTI Crude Oil,NYMEX,USD,1000,USD per barrel,commodity,energy
+HO,NY Harbor ULSD (Heating Oil),NYMEX,USD,42000,USD per gallon,commodity,energy
+RB,RBOB Gasoline,NYMEX,USD,42000,USD per gallon,commodity,energy
+NG,Henry Hub Natural Gas,NYMEX,USD,10000,USD per MMBtu,commodity,energy
+GC,Gold,COMEX,USD,100,USD per troy oz,commodity,metals
+PL,Platinum,NYMEX,USD,50,USD per troy oz,commodity,metals
+HG,Copper,COMEX,USD,25000,USD per lb,commodity,metals
+C,Corn,CBOT,USD,50,US cents per bushel,commodity,grains
+W,Chicago SRW Wheat,CBOT,USD,50,US cents per bushel,commodity,grains
+KW,KC HRW Wheat,CBOT,USD,50,US cents per bushel,commodity,grains
+S,Soybeans,CBOT,USD,50,US cents per bushel,commodity,grains
+SM,Soybean Meal,CBOT,USD,100,USD per short ton,commodity,grains
+BO,Soybean Oil,CBOT,USD,600,US cents per lb,commodity,grains
+RR,Rough Rice,CBOT,USD,2000,USD per cwt,commodity,grains
+LC,Live Cattle,CME,USD,400,US cents per lb,commodity,livestock
+FC,Feeder Cattle,CME,USD,500,US cents per lb,commodity,livestock
+LH,Lean Hogs,CME,USD,400,US cents per lb,commodity,livestock
+VX,Cboe VIX,CBOE,USD,1000,volatility points,volatility,volatility
+BTC,Bitcoin,CME,USD,5,USD per BTC,crypto,crypto

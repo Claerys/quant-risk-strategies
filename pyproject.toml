@@ -22,6 +22,9 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+quant_risk = ["*.csv"]
+
 [tool.ruff]
 line-length = 110
 target-version = "py311"
