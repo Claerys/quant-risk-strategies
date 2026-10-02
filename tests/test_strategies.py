@@ -79,3 +79,17 @@ def test_mean_reversion_leans_against_a_spike() -> None:
 def test_crossover_rejects_inverted_windows() -> None:
     with pytest.raises(ValueError):
         ma_crossover(frame(ES=trending(0.1)), fast=100, slow=20)
+
+
+@pytest.mark.parametrize("name", list(STRATEGIES))
+def test_holiday_on_another_exchange_does_not_blank_the_signal(name: str) -> None:
+    us = trending(0.3)
+    eu = trending(0.3, seed=3)
+    closes = frame(ES=us, FDAX=eu)
+    closes.iloc[::10, 0] = np.nan  # ES closed every 10th day while FDAX trades
+    with_gaps = STRATEGIES[name](closes)["ES"]
+    alone = STRATEGIES[name](frame(ES=us.iloc[[i for i in range(len(us)) if i % 10]]))["ES"]
+    # On ES's own trading days the signal is exactly what ES alone would give.
+    pd.testing.assert_series_equal(with_gaps.reindex(alone.index), alone)
+    # And on its closed days the last signal is carried, not blanked.
+    assert with_gaps.iloc[-100:].notna().all()
