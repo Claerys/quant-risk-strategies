@@ -1,0 +1,16 @@
+# Risk limits for a $10,000,000 account at a 15% annual volatility target.
+#
+# Every value must be set: a missing limit stops trading rather than meaning "unlimited".
+# Calibration: set just above where the trend strategies normally operate (their 99th
+# percentile, 2024-2025), so limits bind in stressed markets rather than every day.
+# Notional = |price| x multiplier x FX, in USD.
+
+[limits]
+max_gross_exposure    = 40_000_000   # 4.0x capital; trend book normally runs ~2.7x
+max_net_exposure      = 25_000_000   # 2.5x capital, directional bet across the book
+max_position_notional =  7_500_000   # 75% of capital in any single instrument
+max_sector_gross      =  8_000_000   # 80% of capital in any one sector
+max_order_contracts   = 100          # per instrument per day; larger moves are spread over days
+max_daily_loss        =    300_000   # 3% of capital in one day; once hit, reduce only
+max_drawdown          = 0.25         # 25% below peak cumulative P&L; once hit, reduce only
+kill_switch           = false        # true blocks every order
