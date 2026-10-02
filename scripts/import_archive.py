@@ -5,6 +5,7 @@ The archive is a folder of ``<SYMBOL>.parquet`` files with columns ts/open/high/
 Every imported series goes through the data-quality checks and a summary is printed.
 
     python scripts/import_archive.py /path/to/archive/daily
+    python scripts/import_archive.py /path/to/archive/daily --fx-hourly /path/to/EURUSD.parquet
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from pathlib import Path
 import pandas as pd
 
 from quant_risk.bars import data_dir, normalize_bars, write_bars
+from quant_risk.fx import fx_dir
 from quant_risk.instruments import load_instruments
 from quant_risk.quality import ERROR, check_bars, summarize
 
@@ -24,7 +26,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("archive", type=Path, help="folder containing <SYMBOL>.parquet daily files")
     parser.add_argument("--out", type=Path, default=None, help=f"destination (default {data_dir()})")
+    parser.add_argument("--fx-hourly", type=Path, nargs="*", default=[],
+                        help="hourly spot FX files such as EURUSD.parquet, saved as daily bars in data/fx")
     args = parser.parse_args(argv)
+
+    for path in args.fx_hourly:
+        daily = hourly_to_daily(pd.read_parquet(path))
+        write_bars(path.stem, daily, fx_dir())
+        print(f"fx {path.stem}: {len(daily)} days, {daily.index[0]:%Y-%m-%d} to {daily.index[-1]:%Y-%m-%d}")
 
     universe = load_instruments()
     files = sorted(args.archive.glob("*.parquet"))
@@ -53,6 +62,15 @@ def main(argv: list[str] | None = None) -> int:
     if errors:
         print(f"\n{errors} error(s): those bars must be fixed or excluded before use", file=sys.stderr)
     return 0
+
+
+def hourly_to_daily(hourly: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate hourly bars into one bar per calendar day (last close of the day)."""
+    hourly = hourly.set_index(pd.to_datetime(hourly["ts"])).sort_index()
+    daily = hourly.resample("D").agg({"open": "first", "high": "max", "low": "min", "close": "last"})
+    daily = daily.dropna(subset=["close"])
+    daily["volume"] = 0
+    return daily
 
 
 if __name__ == "__main__":

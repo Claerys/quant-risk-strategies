@@ -9,6 +9,7 @@ user builds their own copy locally.
 
 ```
 data/daily/<SYMBOL>.parquet    one file per instrument: date, open, high, low, close, volume
+data/fx/EURUSD.parquet         daily spot EUR/USD, used to convert euro P&L into USD
 ```
 
 Symbols and contract specs are in [`src/quant_risk/instruments.csv`](../src/quant_risk/instruments.csv).
@@ -22,7 +23,9 @@ instrument with columns `ts, open, high, low, close, volume`):
 python scripts/import_archive.py /path/to/archive/daily
 ```
 
-The script imports every symbol in the universe and prints a data-quality summary.
+The script imports every symbol in the universe and prints a data-quality summary. Add
+`--fx-hourly /path/to/EURUSD.parquet` to import spot EUR/USD as well (hourly bars are aggregated to
+daily). Outside the spot file's dates, EUR/USD is extended with Euro FX futures price changes.
 
 **From Interactive Brokers**: downloader coming next.
 
