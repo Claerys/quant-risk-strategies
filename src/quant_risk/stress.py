@@ -20,6 +20,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from quant_risk.bars import REPO_ROOT
@@ -86,6 +87,9 @@ def scenario_price_moves(scenario: Scenario, closes: pd.DataFrame) -> pd.Series:
     latest = closes.ffill().iloc[-1]
     if scenario.kind == "shock":
         return pd.Series({s: latest[s] * scenario.shock_for(s) / 100.0 for s in closes.columns})
+    if scenario.start < closes.index[0]:
+        # Not covered by the data. NaN, not zero: "no loss" would be a false reassurance.
+        return pd.Series(np.nan, index=closes.columns)
     end = closes.ffill().loc[: scenario.end].iloc[-1]
     start = closes.ffill().loc[: scenario.start].iloc[-1]
     return (end - start).fillna(0.0)  # an instrument not trading yet contributes nothing
@@ -103,9 +107,11 @@ class StressResult:
 
 
 def run_scenario(scenario: Scenario, positions: pd.Series, closes: pd.DataFrame) -> StressResult:
-    moves = scenario_price_moves(scenario, closes).reindex(positions.index).fillna(0.0)
+    moves = scenario_price_moves(scenario, closes)
     per_point = _usd_per_point(list(positions.index), closes.index[-1])
-    by_instrument = positions.fillna(0.0) * moves * per_point
+    if moves.isna().all():
+        return StressResult(scenario, float("nan"), pd.Series(0.0, index=positions.index))
+    by_instrument = positions.fillna(0.0) * moves.reindex(positions.index).fillna(0.0) * per_point
     return StressResult(scenario, float(by_instrument.sum()), by_instrument)
 
 
@@ -120,7 +126,7 @@ def stress_table(positions: pd.Series, closes: pd.DataFrame, *, capital: float,
             "category": scenario.category,
             "P&L": result.pnl,
             "% of capital": result.pnl / capital,
-            "biggest losses": result.top_contributors(),
+            "biggest losses": result.top_contributors() if result.pnl == result.pnl else "no data for this period",
             "description": scenario.description,
         })
     return pd.DataFrame(rows).set_index("scenario")

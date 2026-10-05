@@ -71,3 +71,11 @@ def test_sector_grid_is_linear_in_the_move() -> None:
     assert grid.loc["energy", "+10%"] == pytest.approx(-2 * 70 * 1000 * 0.10)
     assert grid.loc["us_equity_index", "-20%"] == pytest.approx(-2 * grid.loc["us_equity_index", "+10%"])
     assert "grains" not in grid.index  # no position, no row
+
+
+def test_scenario_before_the_data_starts_is_reported_as_missing_not_zero() -> None:
+    lehman = Scenario("Lehman", "historical", "historical", "", start=pd.Timestamp("2008-09-12"),
+                      end=pd.Timestamp("2008-10-10"))
+    table = stress_table(pd.Series({"ES": 1.0, "C": 0.0, "CL": 0.0}), CLOSES, capital=1e6, scenarios=[lehman])
+    assert pd.isna(table.loc["Lehman", "P&L"])
+    assert table.loc["Lehman", "biggest losses"] == "no data for this period"
