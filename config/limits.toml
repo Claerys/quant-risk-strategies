@@ -12,5 +12,6 @@ max_position_notional =  7_500_000   # 75% of capital in any single instrument
 max_sector_gross      =  8_000_000   # 80% of capital in any one sector
 max_order_contracts   = 100          # per instrument per day; larger moves are spread over days
 max_daily_loss        =    300_000   # 3% of capital in one day; once hit, reduce only
-max_drawdown          = 0.25         # 25% below peak cumulative P&L; once hit, reduce only
+max_drawdown          = 0.25         # 25% below peak cumulative P&L; once hit, close everything
+max_var_99            =    250_000   # 2.5% of capital: 1-day 99% filtered historical VaR after trading
 kill_switch           = false        # true blocks every order

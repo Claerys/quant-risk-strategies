@@ -20,6 +20,7 @@ LIMITS = RiskLimits(
     max_order_contracts=50,
     max_daily_loss=10_000,
     max_drawdown=0.10,
+    max_var_99=1_000_000,
 )
 SYMBOLS = ["ES", "NQ", "TY", "CL"]
 VALUE = pd.Series({"ES": 250_000.0, "NQ": 400_000.0, "TY": 110_000.0, "CL": 70_000.0})
@@ -40,7 +41,8 @@ def run(current, target, limits=LIMITS, daily_pnl=0.0, drawdown=0.0):
 def test_missing_limit_refuses_to_start() -> None:
     with pytest.raises(LimitsNotConfigured, match="max_daily_loss is not set"):
         RiskLimits.from_mapping({"max_gross_exposure": 1, "max_net_exposure": 1, "max_position_notional": 1,
-                                 "max_sector_gross": 1, "max_order_contracts": 1, "max_drawdown": 0.1})
+                                 "max_sector_gross": 1, "max_order_contracts": 1, "max_drawdown": 0.1,
+                                 "max_var_99": 1})
 
 
 def test_zero_or_text_limit_is_rejected() -> None:

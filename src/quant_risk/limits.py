@@ -13,6 +13,7 @@ day's P&L or the current drawdown cannot be measured, nothing that adds risk is 
                      while the drawdown, measured from the peak of cumulative P&L, is beyond it
 
 **Soft limits** shrink the proposal until it fits, instead of rejecting it:
+    max VaR (99%, 1-day)      enforced by the trading cycle, which holds the history VaR needs
     max order size            contracts in a single order
     max position notional     USD value of one instrument's position
     max sector gross          USD value of all positions in one sector
@@ -52,6 +53,7 @@ class RiskLimits:
     max_order_contracts: int
     max_daily_loss: float  # USD, positive number
     max_drawdown: float  # fraction of capital, positive number (0.20 = 20%)
+    max_var_99: float  # USD, 1-day 99% filtered historical VaR of the book after trading
     kill_switch: bool = False
 
     @classmethod
