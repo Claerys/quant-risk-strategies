@@ -15,6 +15,10 @@ Methods:
                  lambda = 0.94). Fast and reacts quickly to volatility, but normal tails are thin.
     monte carlo  simulate correlated scenarios from the same covariance, with Student-t tails
                  (5 degrees of freedom by default) to allow for fat tails.
+    filtered     filtered historical simulation: each historical day's P&L is divided by the
+    historical   volatility forecast for that day and multiplied by today's, instrument by
+                 instrument. Keeps the real fat-tailed, correlated shapes of history but at
+                 today's volatility, so a calm two-year window cannot hide a volatile market.
 """
 
 from __future__ import annotations
@@ -34,6 +38,22 @@ def portfolio_scenarios(positions: pd.Series, pnl_per_contract: pd.DataFrame, wi
     """Hypothetical daily P&L of today's positions over the last `window` days of history."""
     history = pnl_per_contract.reindex(columns=positions.index).iloc[-window:].fillna(0.0)
     return history @ positions.fillna(0.0)
+
+
+def ewma_vol_forecast(pnl_per_contract: pd.DataFrame, span: int = RISKMETRICS_SPAN) -> pd.DataFrame:
+    """Per-instrument volatility forecast: the value on day t uses P&L up to and including day t."""
+    return np.sqrt((pnl_per_contract.fillna(0.0) ** 2).ewm(span=span, adjust=False).mean())
+
+
+def filtered_scenarios(
+    positions: pd.Series, pnl_per_contract: pd.DataFrame, window: int = 500
+) -> pd.Series:
+    """Hypothetical P&L of today's positions with history rescaled to today's volatility."""
+    pnl = pnl_per_contract.reindex(columns=positions.index).fillna(0.0)
+    vol = ewma_vol_forecast(pnl)
+    standardised = (pnl / vol.shift(1)).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    rescaled = standardised.iloc[-window:] * vol.iloc[-1]
+    return rescaled @ positions.fillna(0.0)
 
 
 def historical_var_es(scenarios: pd.Series, level: float) -> tuple[float, float]:
@@ -90,9 +110,11 @@ def var_table(
     pnl = pnl_per_contract.reindex(columns=positions.index).fillna(0.0)
     covariance = ewma_covariance(pnl, RISKMETRICS_SPAN)[-1]
     scenarios = portfolio_scenarios(positions, pnl, window)
+    filtered = filtered_scenarios(positions, pnl, window)
     rows = {}
     for name, fn in {
         "historical": lambda lv: historical_var_es(scenarios, lv),
+        "filtered historical": lambda lv: historical_var_es(filtered, lv),
         "parametric (normal)": lambda lv: parametric_var_es(positions, covariance, lv),
         "monte carlo (t, 5 dof)": lambda lv: monte_carlo_var_es(positions, covariance, lv),
     }.items():
@@ -140,14 +162,22 @@ def rolling_var(
 
     Only data up to and including that close is used, so the series can be backtested honestly.
     """
-    pnl = pnl_per_contract.reindex(index=positions.index, columns=positions.columns).fillna(0.0).to_numpy()
+    frame = pnl_per_contract.reindex(index=positions.index, columns=positions.columns).fillna(0.0)
+    pnl = frame.to_numpy()
     x = positions.fillna(0.0).to_numpy()
     out = np.full(len(x), np.nan)
+    # Same order statistic as np.quantile(..., method="lower") in historical_var_es.
+    k = int(np.floor((1.0 - level) * (window - 1)))
     if method == "historical":
-        # Same order statistic as np.quantile(..., method="lower") in historical_var_es.
-        k = int(np.floor((1.0 - level) * (window - 1)))
         for t in range(window - 1, len(x)):
             scenarios = pnl[t - window + 1 : t + 1] @ x[t]
+            out[t] = -np.partition(scenarios, k)[k]
+    elif method == "filtered":
+        vol = ewma_vol_forecast(frame).to_numpy()
+        with np.errstate(divide="ignore", invalid="ignore"):
+            z = np.nan_to_num(pnl / np.vstack([np.full(pnl.shape[1], np.nan), vol[:-1]]), posinf=0.0, neginf=0.0)
+        for t in range(window - 1, len(x)):
+            scenarios = (z[t - window + 1 : t + 1] * vol[t]) @ x[t]
             out[t] = -np.partition(scenarios, k)[k]
     elif method == "parametric":
         z = NormalDist().inv_cdf(level)
@@ -155,5 +185,5 @@ def rolling_var(
         variance = np.einsum("ti,tij,tj->t", x, covariance, x)
         out = z * np.sqrt(np.clip(variance, 0.0, None))
     else:
-        raise ValueError(f"unknown method {method!r}; use 'historical' or 'parametric'")
+        raise ValueError(f"unknown method {method!r}; use 'historical', 'filtered' or 'parametric'")
     return pd.Series(out, index=positions.index, name=f"{method} VaR {level:.0%}")

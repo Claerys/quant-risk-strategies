@@ -7,6 +7,7 @@ import pytest
 from quant_risk.sizing import ewma_covariance
 from quant_risk.var import (
     RISKMETRICS_SPAN,
+    filtered_scenarios,
     historical_var_es,
     monte_carlo_var_es,
     parametric_var_es,
@@ -106,3 +107,21 @@ def test_rolling_parametric_var_tracks_volatility() -> None:
     pnl.iloc[500:] *= 3
     var = rolling_var(pd.DataFrame({"ES": 1.0}, index=DATES), pnl, method="parametric")
     assert var.iloc[900] / var.iloc[450] == pytest.approx(3.0, rel=0.35)
+
+
+def test_filtered_var_reacts_to_a_volatility_jump_that_plain_history_misses() -> None:
+    pnl = normal_pnl({"ES": 1_000.0})
+    pnl.iloc[900:] *= 3  # volatility triples 100 days before the end
+    positions = pd.DataFrame({"ES": 1.0}, index=DATES)
+    plain = rolling_var(positions, pnl, method="historical", window=500).iloc[-1]
+    filtered = rolling_var(positions, pnl, method="filtered", window=500).iloc[-1]
+    assert filtered / plain > 1.5
+    assert filtered == pytest.approx(3 * 1_000 * 2.33, rel=0.3)
+
+
+def test_filtered_rolling_and_point_estimate_agree() -> None:
+    pnl = normal_pnl({"ES": 1_000.0, "TY": 300.0}, corr=0.2)
+    book = pd.Series({"ES": 1.0, "TY": -3.0})
+    point = historical_var_es(filtered_scenarios(book, pnl, 500), 0.99)[0]
+    rolling = rolling_var(pd.DataFrame([book] * len(DATES), index=DATES), pnl, method="filtered").iloc[-1]
+    assert rolling == pytest.approx(point)
