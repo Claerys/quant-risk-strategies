@@ -106,19 +106,25 @@ with tab_var:
     st.subheader("What drives VaR (Euler contributions, 99% parametric)")
     contrib = report.contributions.reset_index().rename(columns={"index": "symbol"})
     contrib = contrib[contrib["contracts"] != 0]
-    fig = px.bar(contrib.sort_values("component VaR"), x="component VaR", y="symbol", color="sector", orientation="h")
-    fig.update_layout(height=max(300, 22 * len(contrib)), margin={"t": 10}, xaxis_title="USD")
+    fig = px.bar(contrib, x="component VaR", y="symbol", color="sector", orientation="h",
+                 color_discrete_sequence=px.colors.qualitative.Dark24)
+    fig.update_layout(height=max(300, 22 * len(contrib)), margin={"t": 10}, xaxis_title="USD",
+                      yaxis={"categoryorder": "total ascending"})
     st.plotly_chart(fig, width="stretch")
     st.caption("A negative bar is a hedge: that position lowers the portfolio's VaR.")
 
 with tab_backtest:
     summary, series = cached_var_backtest(strategy, float(capital))
     st.subheader("Did losses exceed 99% VaR as often as promised?")
+    shown = summary[["exceptions", "expected", "exception rate", "Kupiec p-value", "independence p-value",
+                     "last 250d exceptions", "Basel zone", "verdict"]]
     st.dataframe(
-        summary.style.format({"exception rate": "{:.2%}", "Kupiec p-value": "{:.3f}",
-                              "independence p-value": "{:.3f}", "worst excess loss": "${:,.0f}"}),
+        shown.style.format({"expected": "{:.0f}", "exception rate": "{:.2%}", "Kupiec p-value": "{:.3f}",
+                            "independence p-value": "{:.3f}"}),
         width="stretch",
     )
+    st.caption(f"{int(summary['days'].iloc[0]):,} trading days since 2004. Kupiec tests the exception count, "
+               "Christoffersen tests whether exceptions cluster, Basel zone counts the last 250 days.")
     method = st.radio("Model", list(summary.index), horizontal=True, index=1)
     data = series[["P&L", f"{method} VaR", f"{method} zone"]].dropna(subset=[f"{method} VaR"])
     breaches = data[data["P&L"] < -data[f"{method} VaR"]]
@@ -169,10 +175,11 @@ with tab_perf:
     cols[2].metric("Sharpe", f"{perf['sharpe']:.2f}")
     cols[3].metric("Max drawdown", pct(perf["max_drawdown"]))
     cols[4].metric("Skew", f"{perf['skew']:.2f}")
-    fig = px.line(report.equity, labels={"value": "equity (USD)", "index": ""})
+    fig = px.line(report.equity, labels={"value": "equity (USD)", "date": ""})
     fig.update_layout(height=300, showlegend=False, margin={"t": 10})
     st.plotly_chart(fig, width="stretch")
-    fig = px.area(report.drawdown, labels={"value": "drawdown", "index": ""}, color_discrete_sequence=["#c62828"])
+    fig = px.area(report.drawdown, labels={"value": "drawdown", "date": "", "index": ""},
+                  color_discrete_sequence=["#c62828"])
     fig.update_layout(height=200, showlegend=False, margin={"t": 10}, yaxis_tickformat=".0%")
     st.plotly_chart(fig, width="stretch")
     if st.toggle("Compare every strategy"):
@@ -196,13 +203,14 @@ with tab_paper:
         else:
             for name, group in cycles.groupby("strategy"):
                 st.subheader(name.replace("_", " "))
-                group = group.set_index(pd.to_datetime(group["date"]))
-                fig = px.line(group, y="equity")
+                group = group.set_index(pd.to_datetime(group["date"]).dt.date)
+                fig = px.line(group, y="equity", labels={"date": "", "equity": "equity (USD)"})
                 halted = group[group["halted"] == 1]
                 fig.add_scatter(x=halted.index, y=halted["equity"], mode="markers", name="halted",
                                 marker={"color": "#c62828", "size": 9})
                 fig.update_layout(height=280, margin={"t": 10})
                 st.plotly_chart(fig, width="stretch")
-                st.dataframe(group[["status", "daily_pnl", "drawdown", "var_99", "orders", "note"]].iloc[::-1]
-                             .style.format({"daily_pnl": "{:+,.0f}", "drawdown": "{:.1%}", "var_99": "${:,.0f}"}),
+                table = group[["status", "daily_pnl", "drawdown", "var_99", "orders", "note"]].iloc[::-1]
+                table.columns = ["status", "daily P&L", "drawdown", "VaR 99%", "orders", "risk engine notes"]
+                st.dataframe(table.style.format({"daily P&L": "{:+,.0f}", "drawdown": "{:.1%}", "VaR 99%": "${:,.0f}"}),
                              width="stretch")
