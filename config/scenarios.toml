@@ -1,0 +1,195 @@
+# Stress scenarios applied to the current portfolio.
+#
+# kind = "historical"   replay every instrument's actual price change between two dates.
+# kind = "shock"        move prices by a percentage of today's price. Keys under [*.shocks] are a
+#                       sector name or an instrument symbol; a symbol overrides its sector.
+#                       Sectors: us_equity_index, eu_equity_index, us_rates, eu_rates, fx, energy,
+#                       metals, grains, livestock, volatility, crypto.
+#
+# Hypothetical and climate shocks are illustrative assumptions, chosen to be internally coherent
+# and of a plausible size, not calibrated forecasts. Each one states its reasoning.
+
+# ------------------------------------------------------------------------------------------------
+# Historical
+# ------------------------------------------------------------------------------------------------
+
+[[scenario]]
+name = "Lehman collapse"
+category = "historical"
+kind = "historical"
+start = 2008-09-12
+end = 2008-10-10
+description = "Four weeks from the Friday before Lehman's bankruptcy: equities -30%, flight to bonds, commodities collapse."
+
+[[scenario]]
+name = "COVID crash"
+category = "historical"
+kind = "historical"
+start = 2020-02-21
+end = 2020-03-23
+description = "From the last pre-crash Friday to the market bottom; oil and equities fall together, VIX above 80."
+
+[[scenario]]
+name = "2022 rate shock"
+category = "historical"
+kind = "historical"
+start = 2022-01-03
+end = 2022-06-16
+description = "Fastest Fed tightening in decades; bonds and equities fall together, so the usual hedge fails."
+
+[[scenario]]
+name = "April 2025 tariff shock"
+category = "historical"
+kind = "historical"
+start = 2025-04-02
+end = 2025-04-08
+description = "Liberation Day tariffs to the trough before the 90-day pause; S&P 500 -12% in four sessions."
+
+[[scenario]]
+name = "Volmageddon"
+category = "historical"
+kind = "historical"
+start = 2018-02-01
+end = 2018-02-08
+description = "Short-volatility products blow up; VIX doubles in a day."
+
+[[scenario]]
+name = "Taper tantrum"
+category = "historical"
+kind = "historical"
+start = 2013-05-21
+end = 2013-06-24
+description = "The Fed hints at slowing bond purchases; 10-year yields jump ~70bp."
+
+# ------------------------------------------------------------------------------------------------
+# Hypothetical
+# ------------------------------------------------------------------------------------------------
+
+[[scenario]]
+name = "Equity crash -20%"
+category = "hypothetical"
+kind = "shock"
+description = "Global equities -20%, flight to quality into bonds, volatility doubles."
+[scenario.shocks]
+us_equity_index = -20.0
+eu_equity_index = -20.0
+us_rates = 3.0
+eu_rates = 2.5
+VX = 100.0
+BTC = -30.0
+
+[[scenario]]
+name = "Rates +100bp"
+category = "hypothetical"
+kind = "shock"
+description = "Parallel +100bp in yields. Price change ~ -duration x 1%: 10y note ~ -6%, 30y bond ~ -15%, Bund ~ -8%."
+[scenario.shocks]
+TY = -6.0
+US = -15.0
+FGBL = -8.0
+us_equity_index = -5.0
+eu_equity_index = -5.0
+
+[[scenario]]
+name = "Oil supply shock"
+category = "hypothetical"
+kind = "shock"
+description = "A major supply disruption: crude +30%, refined products follow, equities fall on growth fears."
+[scenario.shocks]
+energy = 30.0
+NG = 10.0
+us_equity_index = -7.0
+eu_equity_index = -9.0
+CD = 3.0
+
+[[scenario]]
+name = "Dollar surge"
+category = "hypothetical"
+kind = "shock"
+description = "USD +10% against every currency in the book (currency futures quote USD per unit, so they fall)."
+[scenario.shocks]
+fx = -10.0
+metals = -5.0
+
+# ------------------------------------------------------------------------------------------------
+# Climate (NGFS-style narratives; illustrative, not calibrated to NGFS model output)
+# ------------------------------------------------------------------------------------------------
+
+[[scenario]]
+name = "Disorderly transition"
+category = "climate"
+kind = "shock"
+description = """Transition risk. Late, abrupt climate policy: a sudden carbon price hits fossil-fuel demand \
+and valuations. Oil and refined products fall; gas falls less (it gains from coal-to-gas switching); \
+equities reprice carbon-intensive sectors; copper and platinum gain from electrification and hydrogen \
+demand; soybean oil gains as a biofuel feedstock; bonds rally on growth fears."""
+[scenario.shocks]
+CL = -25.0
+HO = -22.0
+RB = -22.0
+NG = -10.0
+us_equity_index = -8.0
+eu_equity_index = -10.0
+HG = 12.0
+PL = 8.0
+BO = 10.0
+us_rates = 2.0
+eu_rates = 2.0
+
+[[scenario]]
+name = "Orderly transition (Net Zero 2050)"
+category = "climate"
+kind = "shock"
+description = """Transition risk, early and predictable policy. The same direction as the disorderly case \
+but smaller, because markets have time to adjust."""
+[scenario.shocks]
+CL = -10.0
+HO = -8.0
+RB = -8.0
+NG = -4.0
+us_equity_index = -2.0
+eu_equity_index = -2.5
+HG = 5.0
+PL = 3.0
+BO = 4.0
+
+[[scenario]]
+name = "Severe Midwest drought"
+category = "climate"
+kind = "shock"
+description = """Acute physical risk. A 2012-scale drought in the US corn belt: corn and soy complex surge; \
+wheat follows through substitution; feeder cattle fall because feed becomes expensive and herds are sold."""
+[scenario.shocks]
+C = 35.0
+S = 25.0
+SM = 25.0
+BO = 15.0
+W = 20.0
+KW = 20.0
+FC = -10.0
+LC = -3.0
+LH = -5.0
+
+[[scenario]]
+name = "Hot house world"
+category = "climate"
+kind = "shock"
+description = """Chronic physical risk: little policy action and repeated climate damage. Crop yields fall \
+(grains up), cooling demand lifts gas, growth and equities suffer, inflation keeps bonds under pressure."""
+[scenario.shocks]
+grains = 20.0
+livestock = 8.0
+NG = 15.0
+us_equity_index = -12.0
+eu_equity_index = -14.0
+us_rates = -3.0
+eu_rates = -3.0
+GC = 8.0
+
+[[scenario]]
+name = "2012 US drought (replay)"
+category = "climate"
+kind = "historical"
+start = 2012-06-15
+end = 2012-08-10
+description = "The actual 2012 drought, the worst in 50 years in the US Midwest: corn +50% in two months."
