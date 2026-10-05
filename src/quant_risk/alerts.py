@@ -14,8 +14,22 @@ import urllib.request
 TELEGRAM_LIMIT = 4000
 
 
+def _load_dotenv() -> None:
+    """Read KEY=VALUE lines from .env into the environment, without overriding real variables."""
+    from quant_risk.bars import REPO_ROOT
+
+    path = REPO_ROOT / ".env"
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        key, sep, value = line.partition("=")
+        if sep and key.strip() and not key.lstrip().startswith("#"):
+            os.environ.setdefault(key.strip(), value.strip())
+
+
 def send(text: str) -> list[str]:
     """Deliver `text` to every configured channel; returns one status line per channel."""
+    _load_dotenv()
     print(text)
     statuses = ["console: ok"]
     token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
