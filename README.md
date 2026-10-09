@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/header.png" alt="Quant Risk Strategies: market risk for a systematic futures portfolio"></p>
+
 # Quant Risk Strategies
 
 **A market-risk engine for a systematic futures portfolio.** Volatility-targeted strategies on 35 futures, a fail-closed pre-trade limit framework, VaR and Expected Shortfall four ways, 20 years of VaR backtesting, historical, hypothetical and climate stress tests, a paper-trading loop with an audit journal, and a daily risk dashboard.
@@ -9,9 +11,18 @@
 
 ![CI](https://github.com/Claerys/quant-risk-strategies/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
 ![Tests](https://img.shields.io/badge/tests-121%20passing-brightgreen)
 
 ![Daily risk report: limit utilisation and exposure by sector](docs/images/01-book-limits.png)
+
+---
+
+## In plain English
+
+Imagine a fund that trades futures (contracts on oil, wheat, government bonds, stock indices) using simple rules. Before anyone asks whether it makes money, a risk team asks three things: *how much could we lose on a bad day, how do we know that estimate is right, and what stops us losing too much?*
+
+This project answers all three on 20 years of real market history. The headline result: the standard industry loss estimates (Value-at-Risk) were **too optimistic for trend-following strategies**, mostly in the crises of 2008 and 2020, when accuracy matters most. A better method that adapts to current volatility cut the worst periods by 63%, and a set of automatic safety limits (a daily loss stop, a drawdown stop-out) stopped the worst losses before they compounded.
 
 ---
 
@@ -177,7 +188,7 @@ Every strategy has negative skew: occasional sharp losses, which is the reason f
 
 ## Quick start
 
-Requires Python 3.11+.
+Requires Python 3.11+. To explore the code without any market data, run the tests (they use simulated markets); to see the dashboard on real numbers you need your own futures data (see below).
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -211,7 +222,7 @@ data/, var/       market data and paper-trading journal, local only (git-ignored
 
 ## Data and limitations
 
-- **Market data is not included.** Exchange data is licensed to whoever downloads it. The project reads an archive of daily back-adjusted continuous futures (to May 2025) plus spot EUR/USD; see [`data/README.md`](data/README.md). An Interactive Brokers downloader is in progress.
+- **Market data is not included.** Exchange data is licensed to whoever downloads it. The project reads an archive of daily back-adjusted continuous futures (to May 2025) plus spot EUR/USD; see [`data/README.md`](data/README.md).
 - **Back-adjusted prices.** Older prices are shifted to remove contract-roll gaps, which can push them below zero. All risk is therefore measured on dollar P&L (price change × multiplier), never on percentage returns. Historical *notional* exposure is only approximate for the same reason, so exposure limits are enforced on today's book, where prices are exact.
 - **Stress tests use today's book unchanged.** A multi-month replay such as 2022 overstates the loss of a strategy that would have traded through it.
 - **Climate shocks are illustrative.** Directions and sizes follow the NGFS narratives and the 2012 drought, but they are not calibrated model output.

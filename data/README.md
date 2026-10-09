@@ -27,7 +27,7 @@ The script imports every symbol in the universe and prints a data-quality summar
 `--fx-hourly /path/to/EURUSD.parquet` to import spot EUR/USD as well (hourly bars are aggregated to
 daily). Outside the spot file's dates, EUR/USD is extended with Euro FX futures price changes.
 
-**From Interactive Brokers**: downloader coming next.
+
 
 ## Notes on the prices
 
