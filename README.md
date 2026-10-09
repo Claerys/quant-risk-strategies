@@ -12,7 +12,7 @@
 ![CI](https://github.com/Claerys/quant-risk-strategies/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
-![Tests](https://img.shields.io/badge/tests-186%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-224%20passing-brightgreen)
 
 ![Daily risk report: limit utilisation and exposure by sector](docs/images/01-book-limits.png)
 
@@ -105,7 +105,8 @@ flowchart LR
 | [`var_backtest`](src/quant_risk/var_backtest.py) | Kupiec proportion-of-failures, Christoffersen independence, Basel traffic light |
 | [`stress`](src/quant_risk/stress.py) | Scenario engine, reverse stress test, sector shock grid |
 | [`cycle`](src/quant_risk/cycle.py), [`paper`](src/quant_risk/paper.py), [`alerts`](src/quant_risk/alerts.py) | Daily trading cycle, simulated broker, SQLite audit journal, Telegram alerts |
-| [`ibkr`](src/quant_risk/ibkr/) | Interactive Brokers connection (optional): downloads futures and EUR/USD from IB Gateway, qualifies every contract before use, and routes orders to a paper account |
+| [`ibkr`](src/quant_risk/ibkr/) | Interactive Brokers connection (optional): downloads futures, stock tickers and EUR/USD from IB Gateway, qualifies every contract before use, plans the smallest request per ticker, and routes orders to a paper account |
+| [`equities.csv`](src/quant_risk/equities.csv) | A 30-name stock universe (S&P 500 names plus SPY): one share is one contract with a multiplier of 1 |
 | [`report`](src/quant_risk/report.py), [`dashboard`](app/dashboard.py) | Daily risk report and the Streamlit dashboard |
 
 ---
@@ -198,7 +199,8 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,dashboard]"
 
 # 1. Get market data (not included): from IB Gateway, or from an archive you already have
-python scripts/download_ibkr.py --dry-run          # see "Connect to Interactive Brokers" below
+python scripts/download_ibkr.py --dry-run          # futures; see "Connect to Interactive Brokers" below
+python scripts/download_ibkr.py --tickers-file config/tickers_sp500_seed.csv   # stocks like AAPL
 python scripts/import_archive.py /path/to/archive/daily --fx-hourly /path/to/EURUSD.parquet
 
 # 2. Compare the strategies and print today's risk report
@@ -218,7 +220,7 @@ src/quant_risk/   library: data, strategies, sizing, limits, VaR, stress, tradin
 app/              Streamlit risk dashboard
 scripts/          data import and IBKR download, backtest, risk report, paper-trading cycle
 config/           limits.toml (risk limits), scenarios.toml (stress and climate scenarios)
-tests/            186 tests on synthetic data and a scripted fake gateway
+tests/            224 tests on synthetic data and a scripted fake gateway
 data/, var/       market data and paper-trading journal, local only (git-ignored)
 ```
 
@@ -233,6 +235,23 @@ Everything above runs without a broker. To download the data yourself instead of
 5. `python scripts/download_ibkr.py` downloads everything (add `--fx` for EUR/USD). A first full download takes hours because IBKR allows about 55 history requests per 10 minutes; later runs fetch only the newest contracts and are checked against what is already on disk before anything is written.
 6. `python scripts/paper_cycle.py --broker ibkr` sends the approved orders to the paper account, after the same pre-trade limits as the simulated broker.
 
+**Stocks.** The same connection downloads stock tickers from a CSV list, one row per ticker, as the BSQF project did. Lists are in [`config/`](config/): `tickers_nasdaq100.csv` (about 100 names), `tickers_nasdaq100_seed.csv` (a short starter) and `tickers_sp500_seed.csv` (30 S&P 500 names plus SPY).
+
+```bash
+python scripts/download_ibkr.py --tickers-file config/tickers_nasdaq100.csv --dry-run   # qualify, write nothing
+python scripts/download_ibkr.py --tickers-file config/tickers_nasdaq100.csv --years 10
+```
+
+Every row is resolved by IBKR first, and a ticker that does not resolve to exactly one contract is skipped and reported, never guessed (put IBKR's `con_id` in the file to settle an ambiguous one). Each ticker then gets the smallest request that brings it up to date: nothing if it is current, only the missing days if it is stale, only the older history if it is short. Bars go to `data/stocks/<TICKER>.parquet`. If IBKR has re-adjusted a stock's history after a split, the new bars no longer match what is on disk, so that ticker is downloaded again from scratch instead of splicing two price scales together.
+
+The risk engine runs on the tickers listed in [`equities.csv`](src/quant_risk/equities.csv) (a share is a contract with a multiplier of 1). Add a row with its sector to include another ticker:
+
+```bash
+QRS_DATA_DIR=data/stocks QRS_LIMITS_FILE=config/limits_equities.toml python scripts/risk_report.py
+```
+
+[`limits_equities.toml`](config/limits_equities.toml) is a starting point for a stock book (order cap in shares, 1.5x gross), not a calibrated set like the futures limits.
+
 ---
 
 ## Data and limitations
@@ -242,6 +261,7 @@ Everything above runs without a broker. To download the data yourself instead of
 - **Stress tests use today's book unchanged.** A multi-month replay such as 2022 overstates the loss of a strategy that would have traded through it.
 - **Climate shocks are illustrative.** Directions and sizes follow the NGFS narratives and the 2012 drought, but they are not calibrated model output.
 - **Costs** are a flat $3 per contract; roll costs are not charged.
+- **Stocks are a starter universe.** Stock bars are split-adjusted but not dividend-adjusted, the 30-name universe is for demonstration, and all published results are for the futures book. The engine's stock path is tested on synthetic prices only.
 - **The IBKR code is tested against a scripted fake gateway, not yet against a live paper session.** Symbols and multipliers in [`futures_map.csv`](src/quant_risk/ibkr/futures_map.csv) are checked against IBKR on every run and any mismatch stops that instrument, but run `--dry-run` once on your own Gateway first.
 - An educational project, not investment advice. Live trading is not supported: only paper ports are accepted.
 
@@ -251,6 +271,6 @@ Everything above runs without a broker. To download the data yourself instead of
 
 I'm **Claire Giuffra Contri**, an MSc Finance student at HKUST (Financial Analysis and Investment Management), on a risk-management exchange at Bocconi, focusing on market and climate risk. Before this I worked on sustainable investment and risk at SCOR, and on green-finance policy at the European Chamber of Commerce in Hong Kong.
 
-This repository is my own rebuild of the risk layer of the **BSQF "Python-integrated IBKR Account for Algo Trading"** project, where I was a Quantitative Risk Management Analyst. The time-series momentum and multi-horizon trend strategies are my contributions to that project, rebuilt here for futures: long and short, and measured on price differences. The IBKR connection code (client, contract qualification, backward history walk) is adapted from that project, used with its authors' permission. Thanks to the BSQF project team.
+This repository is my own rebuild of the risk layer of the **BSQF "Python-integrated IBKR Account for Algo Trading"** project, where I was a Quantitative Risk Management Analyst. The time-series momentum and multi-horizon trend strategies are my contributions to that project, rebuilt here for futures: long and short, and measured on price differences. That project also worked with equity tickers such as AAPL and S&P 500 names, which is why the IBKR download here handles stock lists as well as futures. The IBKR connection code (client, contract qualification, ticker lists, update planning, backward history walk) is adapted from that project, used with its authors' permission. Thanks to the BSQF project team.
 
 [LinkedIn](https://www.linkedin.com/in/claire-g-a0408119b/) · [GitHub](https://github.com/Claerys)

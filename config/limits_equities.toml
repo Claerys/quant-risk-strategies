@@ -1,0 +1,20 @@
+# Risk limits for a $10,000,000 stock book at a 15% annual volatility target.
+#
+# Use with the stock universe:
+#   QRS_DATA_DIR=data/stocks QRS_LIMITS_FILE=config/limits_equities.toml python scripts/risk_report.py
+#
+# Every value must be set: a missing limit stops trading rather than meaning "unlimited".
+# Same structure as limits.toml, with two differences: one "contract" is one share, so the order
+# cap is in shares, and stock books run closer to 1x than a leveraged futures book.
+# These values are a starting point, not calibrated like limits.toml. Check them on your own data.
+
+[limits]
+max_gross_exposure    = 15_000_000   # 1.5x capital
+max_net_exposure      = 10_000_000   # 1.0x capital
+max_position_notional =  2_000_000   # 20% of capital in any single stock
+max_sector_gross      =  4_000_000   # 40% of capital in any one sector
+max_order_contracts   = 20_000       # shares per stock per day; larger moves are spread over days
+max_daily_loss        =    300_000   # 3% of capital in one day; once hit, reduce only
+max_drawdown          = 0.25         # 25% below peak cumulative P&L; once hit, close everything
+max_var_99            =    250_000   # 2.5% of capital: 1-day 99% filtered historical VaR after trading
+kill_switch           = false        # true blocks every order

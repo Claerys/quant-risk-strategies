@@ -87,6 +87,7 @@ class FakeClient:
     accounts: list[str] = field(default_factory=lambda: ["DU1234567"])
     calls: list = field(default_factory=list)
     orders: list = field(default_factory=list)
+    bars_fn: Callable[..., pd.DataFrame] | None = None  # (key, end, duration) -> bars; overrides `bars`
     connect_error: Exception | None = None
     connected_with: Any = None
     disconnected: bool = False
@@ -118,14 +119,19 @@ class FakeClient:
 
     def historical_bars(self, key: ContractKey, end: str, duration: str, what: str = "TRADES",
                         bar_size: str = "1 day", use_rth: bool = True) -> pd.DataFrame:
-        self.calls.append(("bars", key.local_symbol or key.symbol, end, what))
+        self.calls.append(("bars", key.local_symbol or key.symbol, end, what, duration))
+        if self.bars_fn is not None:
+            return self.bars_fn(key, end, duration)
         return self.bars.get(key.local_symbol or key.symbol, pd.DataFrame(
             columns=["open", "high", "low", "close", "volume"]))
 
     def positions(self) -> dict[ContractKey, float]:
         def root(local: str) -> str:
-            return next((r for r, found in self.months.items() if any(m[0] == local for m in found)), "ES")
-        return {ContractKey(symbol=root(local), sec_type="FUT", trading_class=root(local), local_symbol=local,
+            return next((r for r, found in self.months.items() if any(m[0] == local for m in found)), local)
+        def is_stock(local: str) -> bool:
+            return any(m[0] == local and m[1] == "" for found in self.months.values() for m in found)
+        return {ContractKey(symbol=root(local), sec_type="STK" if is_stock(local) else "FUT",
+                            trading_class="" if is_stock(local) else root(local), local_symbol=local,
                             con_id=i + 1): qty for i, (local, qty) in enumerate(self.held.items()) if qty}
 
     def place_market_order(self, key: ContractKey, quantity: float, account: str) -> OrderResult:

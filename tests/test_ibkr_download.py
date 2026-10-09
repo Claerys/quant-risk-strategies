@@ -109,5 +109,5 @@ def test_download_fx_writes_a_daily_series(tmp_path):
     fake = FakeClient(months={"EUR": [("EUR.USD", "", 5)]}, bars={"EUR.USD": fx})
     days = download_fx(fake, years=20, directory=tmp_path, today=pd.Timestamp("2025-03-31"), pacer=pacer())
     assert days == len(fx)
-    assert ("bars", "EUR.USD", "", "MIDPOINT") in fake.calls
+    assert any(c[:4] == ("bars", "EUR.USD", "", "MIDPOINT") for c in fake.calls)
     assert bars_path("EURUSD", tmp_path).exists()

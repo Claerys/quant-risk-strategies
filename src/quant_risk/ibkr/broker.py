@@ -4,6 +4,9 @@
 so ``cycle.run_cycle`` and its pre-trade limits are unchanged: the cycle still decides what the book
 may hold, the broker only carries out the approved orders.
 
+Futures go to the front month (``contracts.front_contract``); stocks go to the one listing IBKR resolves
+the ticker to (``primary_exchange`` from equities.csv), one share per contract.
+
 Safety, in layers:
   * the port must be a paper port and the account id must start with ``DU`` (IBKR's paper prefix);
   * every order's front-month contract is qualified before the first order is sent, so a lookup
@@ -23,13 +26,12 @@ import pandas as pd
 from quant_risk.ibkr.config import IbkrSettings, require_paper_port
 from quant_risk.ibkr.contract import ContractKey
 from quant_risk.ibkr.contracts import (
-    ContractMonth,
     front_contract,
     futures_chain,
     futures_map_for,
     load_futures_map,
 )
-from quant_risk.instruments import Instrument, load_instruments
+from quant_risk.instruments import Instrument, load_equities, load_instruments
 from quant_risk.paper import VAR_DIR, Fill
 
 PAPER_ACCOUNT_PREFIX = "DU"
@@ -47,7 +49,7 @@ class IbkrBroker:
         if known and account not in known:
             raise ValueError(f"account {account} is not among the connected accounts {known}")
         self.client, self.account = client, account
-        self.instruments = instruments or load_instruments()
+        self.instruments = instruments or {**load_instruments(), **load_equities()}
         self.state_path, self.cost_per_contract = state_path, cost_per_contract
         self.ignored: list[str] = []  # held contracts outside the universe, left alone
 
@@ -58,6 +60,8 @@ class IbkrBroker:
         return pd.Timestamp(json.loads(self.state_path.read_text())["last_date"])
 
     def _symbol_of(self, key: ContractKey) -> str | None:
+        if key.sec_type == "STK":
+            return key.symbol if key.symbol in load_equities() else None
         for symbol, mapping in load_futures_map().items():
             if (key.sec_type == "FUT" and key.symbol == mapping.ibkr_symbol
                     and key.trading_class in ("", mapping.trading_class)):
@@ -75,9 +79,17 @@ class IbkrBroker:
             held[symbol] = held.get(symbol, 0.0) + quantity
         return pd.Series(held, dtype=float)
 
-    def _front(self, symbol: str, today: pd.Timestamp) -> ContractMonth:
-        months = futures_chain(self.client, self.instruments[symbol], include_expired=False)
-        return front_contract(months, today)
+    def _contract(self, symbol: str, today: pd.Timestamp) -> ContractKey:
+        instrument = self.instruments[symbol]
+        if symbol in load_equities():
+            row = ContractKey(symbol=symbol, sec_type="STK", exchange=instrument.exchange,
+                              currency=instrument.currency, primary_exchange=instrument.primary_exchange)
+            return self.client.qualify(row).key  # exactly one listing, or QualificationError
+        months = futures_chain(self.client, instrument, include_expired=False)
+        return front_contract(months, today).key
+
+    def _price_scale(self, symbol: str) -> float:
+        return 1.0 if symbol in load_equities() else futures_map_for(self.instruments[symbol]).price_scale
 
     def execute(self, orders: pd.Series, prices: pd.Series, date: pd.Timestamp) -> list[Fill]:
         wanted = {s: float(q) for s, q in orders.items() if q != 0}
@@ -85,15 +97,15 @@ class IbkrBroker:
             if abs(quantity - round(quantity)) > 1e-9:
                 raise ValueError(f"{symbol}: order of {quantity} contracts is not a whole number")
         # Qualify everything first: one failed lookup must mean no orders at all.
-        fronts = {symbol: self._front(symbol, pd.Timestamp(date)) for symbol in wanted}
+        contracts = {symbol: self._contract(symbol, pd.Timestamp(date)) for symbol in wanted}
 
         fills: list[Fill] = []
         for symbol, quantity in wanted.items():
-            result = self.client.place_market_order(fronts[symbol].key, round(quantity), self.account)
+            result = self.client.place_market_order(contracts[symbol], round(quantity), self.account)
             if result.filled <= 0:
                 continue
             signed = result.filled if quantity > 0 else -result.filled
-            price = result.avg_price * futures_map_for(self.instruments[symbol]).price_scale
+            price = result.avg_price * self._price_scale(symbol)
             fills.append(Fill(symbol, signed, price, result.filled * self.cost_per_contract))
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         self.state_path.write_text(json.dumps({"last_date": pd.Timestamp(date).strftime("%Y-%m-%d")}))

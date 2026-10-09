@@ -19,6 +19,7 @@ class ContractKey:
     sec_type: str = "FUT"
     exchange: str = ""
     currency: str = "USD"
+    primary_exchange: str = ""  # stocks: SMART routes, this says which listing is meant
     expiry: str = ""  # lastTradeDateOrContractMonth
     multiplier: str = ""
     trading_class: str = ""
@@ -35,7 +36,7 @@ class ContractKey:
         """conId wins when known; otherwise every descriptive field takes part."""
         if self.con_id > 0:
             return ("conid", self.con_id)
-        return ("composite", self.symbol, self.sec_type, self.exchange, self.currency, self.expiry,
+        return ("composite", self.symbol, self.sec_type, self.exchange, self.currency, self.primary_exchange, self.expiry,
                 self.multiplier, self.trading_class, self.local_symbol)
 
     def __hash__(self) -> int:
@@ -62,6 +63,7 @@ class ContractKey:
         contract.currency = self.currency
         contract.includeExpired = self.include_expired
         for attribute, value in (
+            ("primaryExchange", self.primary_exchange),
             ("lastTradeDateOrContractMonth", self.expiry),
             ("multiplier", self.multiplier),
             ("tradingClass", self.trading_class),
@@ -78,6 +80,7 @@ class ContractKey:
             sec_type=getattr(contract, "secType", "") or "FUT",
             exchange=getattr(contract, "exchange", "") or "",
             currency=getattr(contract, "currency", "") or "USD",
+            primary_exchange=getattr(contract, "primaryExchange", "") or "",
             expiry=getattr(contract, "lastTradeDateOrContractMonth", "") or "",
             multiplier=str(getattr(contract, "multiplier", "") or ""),
             trading_class=getattr(contract, "tradingClass", "") or "",

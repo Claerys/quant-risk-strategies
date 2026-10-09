@@ -24,6 +24,7 @@ class Instrument:
     price_unit: str
     asset_class: str
     sector: str
+    primary_exchange: str = ""  # stocks only: the listing SMART should resolve to
 
     def pnl(self, price_change: float, contracts: float = 1.0) -> float:
         """Profit or loss, in the contract currency, of a price move on `contracts` contracts."""
@@ -34,10 +35,8 @@ class Instrument:
         return price * self.multiplier * contracts
 
 
-@cache
-def load_instruments() -> dict[str, Instrument]:
-    """All instruments in the universe, keyed by symbol."""
-    text = resources.files("quant_risk").joinpath("instruments.csv").read_text(encoding="utf-8")
+def _read_universe(filename: str) -> dict[str, Instrument]:
+    text = resources.files("quant_risk").joinpath(filename).read_text(encoding="utf-8")
     instruments = {}
     for row in csv.DictReader(text.splitlines()):
         multiplier = float(row["multiplier"])
@@ -52,12 +51,29 @@ def load_instruments() -> dict[str, Instrument]:
             price_unit=row["price_unit"],
             asset_class=row["asset_class"],
             sector=row["sector"],
+            primary_exchange=row.get("primary_exchange") or "",
         )
     return instruments
 
 
+@cache
+def load_instruments() -> dict[str, Instrument]:
+    """The futures universe (instruments.csv), keyed by symbol."""
+    return _read_universe("instruments.csv")
+
+
+@cache
+def load_equities() -> dict[str, Instrument]:
+    """The stock universe (equities.csv): one share is one contract with a multiplier of 1.
+
+    Kept apart from the futures universe so that the futures results never change when stocks
+    are added. Point the engine at stock data with QRS_DATA_DIR=data/stocks.
+    """
+    return _read_universe("equities.csv")
+
+
 def get_instrument(symbol: str) -> Instrument:
-    try:
-        return load_instruments()[symbol]
-    except KeyError:
-        raise KeyError(f"unknown instrument {symbol!r}; add it to instruments.csv") from None
+    for universe in (load_instruments(), load_equities()):
+        if symbol in universe:
+            return universe[symbol]
+    raise KeyError(f"unknown instrument {symbol!r}; add it to instruments.csv (futures) or equities.csv (stocks)")

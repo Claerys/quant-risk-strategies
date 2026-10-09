@@ -1,0 +1,31 @@
+symbol,name,exchange,currency,multiplier,price_unit,asset_class,sector,primary_exchange
+SPY,SPDR S&P 500 ETF,SMART,USD,1,USD per share,etf,index,ARCA
+AAPL,Apple,SMART,USD,1,USD per share,equity,technology,NASDAQ
+MSFT,Microsoft,SMART,USD,1,USD per share,equity,technology,NASDAQ
+NVDA,Nvidia,SMART,USD,1,USD per share,equity,technology,NASDAQ
+AVGO,Broadcom,SMART,USD,1,USD per share,equity,technology,NASDAQ
+ORCL,Oracle,SMART,USD,1,USD per share,equity,technology,NYSE
+GOOGL,Alphabet A,SMART,USD,1,USD per share,equity,communication_services,NASDAQ
+META,Meta Platforms,SMART,USD,1,USD per share,equity,communication_services,NASDAQ
+NFLX,Netflix,SMART,USD,1,USD per share,equity,communication_services,NASDAQ
+AMZN,Amazon,SMART,USD,1,USD per share,equity,consumer_discretionary,NASDAQ
+TSLA,Tesla,SMART,USD,1,USD per share,equity,consumer_discretionary,NASDAQ
+HD,Home Depot,SMART,USD,1,USD per share,equity,consumer_discretionary,NYSE
+MCD,McDonald's,SMART,USD,1,USD per share,equity,consumer_discretionary,NYSE
+COST,Costco,SMART,USD,1,USD per share,equity,consumer_staples,NASDAQ
+PG,Procter & Gamble,SMART,USD,1,USD per share,equity,consumer_staples,NYSE
+KO,Coca-Cola,SMART,USD,1,USD per share,equity,consumer_staples,NYSE
+JPM,JPMorgan Chase,SMART,USD,1,USD per share,equity,financials,NYSE
+V,Visa,SMART,USD,1,USD per share,equity,financials,NYSE
+BAC,Bank of America,SMART,USD,1,USD per share,equity,financials,NYSE
+UNH,UnitedHealth,SMART,USD,1,USD per share,equity,health_care,NYSE
+LLY,Eli Lilly,SMART,USD,1,USD per share,equity,health_care,NYSE
+JNJ,Johnson & Johnson,SMART,USD,1,USD per share,equity,health_care,NYSE
+MRK,Merck,SMART,USD,1,USD per share,equity,health_care,NYSE
+XOM,Exxon Mobil,SMART,USD,1,USD per share,equity,energy,NYSE
+CVX,Chevron,SMART,USD,1,USD per share,equity,energy,NYSE
+CAT,Caterpillar,SMART,USD,1,USD per share,equity,industrials,NYSE
+GE,GE Aerospace,SMART,USD,1,USD per share,equity,industrials,NYSE
+LIN,Linde,SMART,USD,1,USD per share,equity,materials,NASDAQ
+NEE,NextEra Energy,SMART,USD,1,USD per share,equity,utilities,NYSE
+PLD,Prologis,SMART,USD,1,USD per share,equity,real_estate,NYSE

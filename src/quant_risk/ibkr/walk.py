@@ -55,13 +55,17 @@ def end_before(day: pd.Timestamp) -> str:
     return f"{(day - pd.Timedelta(days=1)):%Y%m%d}-23:59:59"
 
 
-def walk_backward(fetch: Callable[[str, str], pd.DataFrame], years: int, *, today: pd.Timestamp) -> WalkResult:
-    """``fetch(duration, end)`` returns daily bars ending at ``end`` ("" means now)."""
+def walk_backward(fetch: Callable[[str, str], pd.DataFrame], years: int, *, today: pd.Timestamp,
+                  anchor: str = "") -> WalkResult:
+    """``fetch(duration, end)`` returns daily bars ending at ``end`` ("" means now).
+
+    ``anchor`` is where to start walking back from; a backfill passes the day before its oldest bar.
+    """
     target = min(max(int(years), 1), MAX_YEARS)
     cutoff = today - pd.DateOffset(years=target)
     frames: list[pd.DataFrame] = []
     result = WalkResult(bars=pd.DataFrame())
-    end, previous_oldest = "", None
+    end, previous_oldest = anchor, None
     for _ in range(chunk_budget(target)):
         result.chunks += 1
         bars = fetch(f"{CHUNK_YEARS} Y", end)

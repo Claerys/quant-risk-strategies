@@ -133,3 +133,41 @@ def test_connect_helper_returns_a_connected_broker_and_disconnects_on_refusal(tm
     with pytest.raises(ValueError, match="connected accounts"):
         connect_ibkr_broker(lambda: other, SETTINGS)
     assert other.disconnected
+
+
+STOCKS = {"AAPL": [("AAPL", "", 265598)], "MSFT": [("MSFT", "", 272093)]}
+
+
+def test_stock_orders_go_to_the_resolved_listing_in_whole_shares(tmp_path):
+    client = FakeClient(months={**MONTHS, **STOCKS}, multipliers={"ES": "50"}, fill_price=190.5)
+    b, _ = broker(tmp_path, client)
+    fills = b.execute(pd.Series({"AAPL": 120.0, "MSFT": -75.0}), pd.Series(dtype=float), TODAY)
+    assert client.orders == [("AAPL", 120, "DU1234567"), ("MSFT", -75, "DU1234567")]
+    assert fills == [Fill("AAPL", 120.0, 190.5, 0.0), Fill("MSFT", -75.0, 190.5, 0.0)]
+    assert b.positions().to_dict() == {"AAPL": 120.0, "MSFT": -75.0}
+
+
+def test_stock_and_futures_positions_are_read_together(tmp_path):
+    client = FakeClient(months={**MONTHS, **STOCKS}, held={"ESH5": 2.0, "AAPL": 50.0, "ZZZZ": 9.0})
+    assert broker(tmp_path, client)[0].positions().to_dict() == {"ES": 2.0, "AAPL": 50.0}
+
+
+def test_an_unresolvable_stock_sends_no_orders_at_all(tmp_path):
+    client = FakeClient(months={**MONTHS, "AAPL": STOCKS["AAPL"]}, multipliers={"ES": "50"})  # no MSFT listing
+    b, _ = broker(tmp_path, client)
+    with pytest.raises(Exception, match="no IBKR contract"):
+        b.execute(pd.Series({"ES": 1.0, "AAPL": 10.0, "MSFT": 10.0}), pd.Series(dtype=float), TODAY)
+    assert client.orders == []
+
+
+def test_an_ambiguous_stock_listing_is_refused(tmp_path):
+    two = {"AAPL": [("AAPL", "", 1), ("AAPL", "", 2)]}
+    client = FakeClient(months=two)
+    with pytest.raises(Exception, match="2 contracts match"):
+        broker(tmp_path, client)[0].execute(pd.Series({"AAPL": 10.0}), pd.Series(dtype=float), TODAY)
+    assert client.orders == []
+
+
+def test_the_universes_do_not_share_a_symbol():
+    from quant_risk.instruments import load_equities, load_instruments
+    assert not set(load_equities()) & set(load_instruments())

@@ -26,6 +26,7 @@ close to or above 100%, not just as a yes/no.
 
 from __future__ import annotations
 
+import os
 import tomllib
 from dataclasses import dataclass, fields
 from pathlib import Path
@@ -82,7 +83,9 @@ class RiskLimits:
         return cls(**kwargs)
 
     @classmethod
-    def from_file(cls, path: Path = DEFAULT_LIMITS_FILE) -> RiskLimits:
+    def from_file(cls, path: Path | None = None) -> RiskLimits:
+        """Read limits from ``path``, else $QRS_LIMITS_FILE, else config/limits.toml."""
+        path = path or Path(os.environ.get("QRS_LIMITS_FILE", DEFAULT_LIMITS_FILE))
         if not path.exists():
             raise LimitsNotConfigured(f"no limits file at {path}; copy config/limits.toml and set every value")
         with path.open("rb") as handle:

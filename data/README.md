@@ -10,6 +10,7 @@ user builds their own copy locally.
 ```
 data/daily/<SYMBOL>.parquet    one file per instrument: date, open, high, low, close, volume
 data/fx/EURUSD.parquet         daily spot EUR/USD, used to convert euro P&L into USD
+data/stocks/<TICKER>.parquet   daily stock bars (split-adjusted), same columns as data/daily
 ```
 
 Symbols and contract specs are in [`src/quant_risk/instruments.csv`](../src/quant_risk/instruments.csv).
@@ -49,3 +50,12 @@ Every listed and expired contract month is fetched, chained into one back-adjust
 `data/daily/<SYMBOL>.parquet`. A later run fetches only the newest months, reconciles them against the
 file already on disk and refuses to write if the two disagree. Nothing is written if the result fails
 the data-quality checks.
+
+For stocks, point the downloader at a ticker list (see `config/`):
+
+```bash
+python scripts/download_ibkr.py --tickers-file config/tickers_sp500_seed.csv --years 10
+```
+
+Rerunning it fetches only what is missing for each ticker. To run the risk engine on that folder use
+`QRS_DATA_DIR=data/stocks QRS_LIMITS_FILE=config/limits_equities.toml`.

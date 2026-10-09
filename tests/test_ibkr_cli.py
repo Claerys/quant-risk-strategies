@@ -53,3 +53,55 @@ def test_one_failing_symbol_does_not_stop_the_others(tmp_path, capsys):
     captured = capsys.readouterr()
     assert code == 1 and "FAILED NQ" in captured.err
     assert bars_path("ES", tmp_path).exists() and "full" in captured.out
+
+
+STOCK_FILE = "symbol,primary_exchange\nAAPL,NASDAQ\nMSFT,NASDAQ\nXXXX,NYSE\n"
+
+
+def stock_client():
+    today = pd.Timestamp.today().normalize()
+    series = bars((today - pd.Timedelta(days=400)).strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d"), 100.0)
+    return FakeClient(months={"AAPL": [("AAPL", "", 1)], "MSFT": [("MSFT", "", 2)]},
+                      bars_fn=lambda key, end, duration: series)
+
+
+def test_ticker_file_downloads_stocks_and_skips_what_ibkr_cannot_resolve(tmp_path, capsys):
+    tickers = tmp_path / "t.csv"
+    tickers.write_text(STOCK_FILE)
+    out = tmp_path / "stocks"
+    code = main(["--tickers-file", str(tickers), "--years", "1", "--out", str(out)], lambda: stock_client())
+    captured = capsys.readouterr()
+    assert code == 0  # a skipped row is reported, it does not fail the run
+    assert "SKIPPED XXXX" in captured.err and "skipped" in captured.err
+    assert (out / "AAPL.parquet").exists() and (out / "MSFT.parquet").exists() and not (out / "XXXX.parquet").exists()
+    assert "full" in captured.out
+
+
+def test_second_run_over_current_data_requests_nothing(tmp_path, capsys):
+    tickers = tmp_path / "t.csv"
+    tickers.write_text("symbol\nAAPL\n")
+    out = tmp_path / "stocks"
+    main(["--tickers-file", str(tickers), "--years", "1", "--out", str(out)], lambda: stock_client())
+    again = stock_client()
+    assert main(["--tickers-file", str(tickers), "--years", "1", "--out", str(out)], lambda: again) == 0
+    assert "skip" in capsys.readouterr().out and not any(c[0] == "bars" for c in again.calls)
+
+
+def test_stock_dry_run_qualifies_and_writes_nothing(tmp_path, capsys):
+    tickers = tmp_path / "t.csv"
+    tickers.write_text(STOCK_FILE)
+    out = tmp_path / "stocks"
+    fake = stock_client()
+    assert main(["--tickers-file", str(tickers), "--dry-run", "--out", str(out)], lambda: fake) == 0
+    assert "conId 1" in capsys.readouterr().out and not out.exists()
+    assert not any(c[0] == "bars" for c in fake.calls)
+
+
+def test_bad_ticker_file_and_unknown_symbol_exit_before_connecting(tmp_path, capsys):
+    def never():
+        raise AssertionError("connected")
+    assert main(["--tickers-file", str(tmp_path / "missing.csv")], never) == 1
+    good = tmp_path / "t.csv"
+    good.write_text("symbol\nAAPL\n")
+    assert main(["--tickers-file", str(good), "--symbols", "ZZZ"], never) == 1
+    assert "unknown symbols" in capsys.readouterr().err
