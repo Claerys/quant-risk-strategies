@@ -5,6 +5,12 @@
     python scripts/paper_cycle.py --replay 2025-03-03 2025-05-30   # every trading day in a period
     python scripts/paper_cycle.py --replay 2025-03-03 2025-05-30 --reset --quiet
 
+    python scripts/paper_cycle.py --broker ibkr                    # send orders to an IBKR paper account
+
+With --broker ibkr the approved orders go to an Interactive Brokers paper account (IB Gateway on
+port 4002 or TWS on 7497, IBKR_ACCOUNT=DU...). Run scripts/download_ibkr.py first so the data is
+current. --replay and --reset are not available there: a real broker cannot replay history.
+
 State (positions) is kept in var/paper_state.json and every cycle is recorded in
 var/journal.sqlite, both git-ignored. --reset starts from a flat book and an empty journal.
 Risk limits are read from config/limits.toml and the run refuses to start if any is missing.
@@ -30,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
     when = parser.add_mutually_exclusive_group()
     when.add_argument("--as-of", help="run one cycle after this day's close (default: latest data)")
     when.add_argument("--replay", nargs=2, metavar=("START", "END"), help="run a cycle for every day in range")
+    parser.add_argument("--broker", choices=["paper", "ibkr"], default="paper",
+                        help="simulated broker (default) or an IBKR paper account")
     parser.add_argument("--reset", action="store_true", help="start from a flat book and empty journal")
     parser.add_argument("--quiet", action="store_true", help="print one line per day instead of full alerts")
     args = parser.parse_args(argv)
@@ -38,6 +46,10 @@ def main(argv: list[str] | None = None) -> int:
         limits = RiskLimits.from_file()
     except LimitsNotConfigured as exc:
         print(exc)
+        return 2
+
+    if args.broker == "ibkr" and (args.replay or args.reset):
+        print("--replay and --reset are only for the simulated broker")
         return 2
 
     if args.reset:
@@ -50,7 +62,19 @@ def main(argv: list[str] | None = None) -> int:
     else:
         days = [pd.Timestamp(args.as_of) if args.as_of else closes.index[-1]]
 
-    broker, journal = PaperBroker(), Journal()
+    client = None
+    if args.broker == "ibkr":
+        from quant_risk.ibkr.broker import connect_ibkr_broker
+        from quant_risk.ibkr.cli import default_client_factory
+
+        try:
+            client, broker = connect_ibkr_broker(default_client_factory)
+        except (ValueError, TimeoutError, OSError) as exc:
+            print(f"cannot use IBKR: {exc}")
+            return 1
+    else:
+        broker = PaperBroker()
+    journal = Journal()
     try:
         for day in days:
             if broker.last_date is not None and day <= broker.last_date:
@@ -64,6 +88,8 @@ def main(argv: list[str] | None = None) -> int:
                       + (f"  | {result.actions[0]}" if result.actions else ""))
     finally:
         journal.close()
+        if client is not None:
+            client.disconnect_and_stop()
     print(f"\njournal: {journal.path}")
     return 0
 

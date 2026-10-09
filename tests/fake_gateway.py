@@ -83,9 +83,21 @@ class FakeClient:
     fills: dict[str, float] = field(default_factory=dict)
     fill_price: float = 100.0
     multiplier: str = "50"
+    multipliers: dict[str, str] = field(default_factory=dict)  # per IBKR root, overrides `multiplier`
     accounts: list[str] = field(default_factory=lambda: ["DU1234567"])
     calls: list = field(default_factory=list)
     orders: list = field(default_factory=list)
+    connect_error: Exception | None = None
+    connected_with: Any = None
+    disconnected: bool = False
+
+    def connect_and_start(self, settings) -> None:
+        if self.connect_error is not None:
+            raise self.connect_error
+        self.connected_with = settings
+
+    def disconnect_and_stop(self) -> None:
+        self.disconnected = True
 
     def candidates(self, key: ContractKey) -> tuple[QualifiedContract, ...]:
         self.calls.append(("candidates", key.symbol, key.include_expired))
@@ -95,7 +107,7 @@ class FakeClient:
         return tuple(
             QualifiedContract.from_contract_details(make_details(
                 symbol=key.symbol, con_id=con_id, sec_type=key.sec_type, exchange=key.exchange,
-                currency=key.currency, expiry=expiry, local_symbol=local, multiplier=self.multiplier))
+                currency=key.currency, expiry=expiry, local_symbol=local, multiplier=self.multipliers.get(key.symbol, self.multiplier)))
             for local, expiry, con_id in found)
 
     def qualify(self, key: ContractKey) -> QualifiedContract:
@@ -111,10 +123,13 @@ class FakeClient:
             columns=["open", "high", "low", "close", "volume"]))
 
     def positions(self) -> dict[ContractKey, float]:
-        return {ContractKey(symbol="ES", local_symbol=local, con_id=i + 1): qty
-                for i, (local, qty) in enumerate(self.held.items())}
+        def root(local: str) -> str:
+            return next((r for r, found in self.months.items() if any(m[0] == local for m in found)), "ES")
+        return {ContractKey(symbol=root(local), sec_type="FUT", trading_class=root(local), local_symbol=local,
+                            con_id=i + 1): qty for i, (local, qty) in enumerate(self.held.items()) if qty}
 
     def place_market_order(self, key: ContractKey, quantity: float, account: str) -> OrderResult:
         self.orders.append((key.local_symbol, quantity, account))
         filled = self.fills.get(key.local_symbol, abs(quantity))
+        self.held[key.local_symbol] = self.held.get(key.local_symbol, 0.0) + (filled if quantity > 0 else -filled)
         return OrderResult(filled=filled, avg_price=self.fill_price, status="Filled")

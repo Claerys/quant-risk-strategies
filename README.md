@@ -12,7 +12,7 @@
 ![CI](https://github.com/Claerys/quant-risk-strategies/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
-![Tests](https://img.shields.io/badge/tests-121%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-186%20passing-brightgreen)
 
 ![Daily risk report: limit utilisation and exposure by sector](docs/images/01-book-limits.png)
 
@@ -74,13 +74,15 @@ Run it yourself with `streamlit run app/dashboard.py` (six tabs: book and limits
 
 ```mermaid
 flowchart LR
-    A[Futures archive<br/>35 instruments] --> B[Data-quality checks]
+    IB[IB Gateway<br/>paper] -->|download| A[Futures archive<br/>35 instruments]
+    A --> B[Data-quality checks]
     B --> C[Strategies<br/>signal -1 to +1]
     C --> D[Position sizing<br/>volatility target]
     D --> E{Pre-trade limits<br/>fail closed}
     E -->|approved book| F[Paper broker]
     E --> G[VaR and ES<br/>4 methods]
     G -->|VaR limit| E
+    F -.->|optional| P[IBKR paper account]
     F --> H[(Audit journal)]
     F --> I[Alerts]
     G --> J[VaR backtesting]
@@ -103,6 +105,7 @@ flowchart LR
 | [`var_backtest`](src/quant_risk/var_backtest.py) | Kupiec proportion-of-failures, Christoffersen independence, Basel traffic light |
 | [`stress`](src/quant_risk/stress.py) | Scenario engine, reverse stress test, sector shock grid |
 | [`cycle`](src/quant_risk/cycle.py), [`paper`](src/quant_risk/paper.py), [`alerts`](src/quant_risk/alerts.py) | Daily trading cycle, simulated broker, SQLite audit journal, Telegram alerts |
+| [`ibkr`](src/quant_risk/ibkr/) | Interactive Brokers connection (optional): downloads futures and EUR/USD from IB Gateway, qualifies every contract before use, and routes orders to a paper account |
 | [`report`](src/quant_risk/report.py), [`dashboard`](app/dashboard.py) | Daily risk report and the Streamlit dashboard |
 
 ---
@@ -194,7 +197,8 @@ Requires Python 3.11+. To explore the code without any market data, run the test
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,dashboard]"
 
-# 1. Load market data (not included, see below)
+# 1. Get market data (not included): from IB Gateway, or from an archive you already have
+python scripts/download_ibkr.py --dry-run          # see "Connect to Interactive Brokers" below
 python scripts/import_archive.py /path/to/archive/daily --fx-hourly /path/to/EURUSD.parquet
 
 # 2. Compare the strategies and print today's risk report
@@ -212,22 +216,34 @@ pytest
 ```
 src/quant_risk/   library: data, strategies, sizing, limits, VaR, stress, trading cycle, report
 app/              Streamlit risk dashboard
-scripts/          data import, backtest, risk report, paper-trading cycle
+scripts/          data import and IBKR download, backtest, risk report, paper-trading cycle
 config/           limits.toml (risk limits), scenarios.toml (stress and climate scenarios)
-tests/            121 tests on synthetic data
+tests/            186 tests on synthetic data and a scripted fake gateway
 data/, var/       market data and paper-trading journal, local only (git-ignored)
 ```
+
+### Connect to Interactive Brokers (optional)
+
+Everything above runs without a broker. To download the data yourself instead of importing an archive:
+
+1. Install IB Gateway (or Trader Workstation) and log in to a **paper** account.
+2. In its settings enable the API socket. Paper ports are `4002` (Gateway) and `7497` (TWS). Live ports `4001` and `7496` are refused by the code, so a typo cannot reach a real account.
+3. `pip install -e ".[ibkr]"`, then `cp .env.example .env` and set `IBKR_PORT` (and `IBKR_ACCOUNT=DU...` to send orders). No password is stored anywhere: the login lives in Gateway.
+4. `python scripts/download_ibkr.py --dry-run --symbols ES TY JY` lists the contract months IBKR returns for each instrument and stops if anything does not match `instruments.csv`.
+5. `python scripts/download_ibkr.py` downloads everything (add `--fx` for EUR/USD). A first full download takes hours because IBKR allows about 55 history requests per 10 minutes; later runs fetch only the newest contracts and are checked against what is already on disk before anything is written.
+6. `python scripts/paper_cycle.py --broker ibkr` sends the approved orders to the paper account, after the same pre-trade limits as the simulated broker.
 
 ---
 
 ## Data and limitations
 
-- **Market data is not included.** Exchange data is licensed to whoever downloads it. The project reads an archive of daily back-adjusted continuous futures (to May 2025) plus spot EUR/USD; see [`data/README.md`](data/README.md).
+- **Market data is not included.** Exchange data is licensed to whoever downloads it. The project reads daily back-adjusted continuous futures plus spot EUR/USD, from an archive you import or from your own IB Gateway; see [`data/README.md`](data/README.md). The reported results use an archive that ends in May 2025.
 - **Back-adjusted prices.** Older prices are shifted to remove contract-roll gaps, which can push them below zero. All risk is therefore measured on dollar P&L (price change × multiplier), never on percentage returns. Historical *notional* exposure is only approximate for the same reason, so exposure limits are enforced on today's book, where prices are exact.
 - **Stress tests use today's book unchanged.** A multi-month replay such as 2022 overstates the loss of a strategy that would have traded through it.
 - **Climate shocks are illustrative.** Directions and sizes follow the NGFS narratives and the 2012 drought, but they are not calibrated model output.
 - **Costs** are a flat $3 per contract; roll costs are not charged.
-- An educational project, not investment advice. Live trading is not supported.
+- **The IBKR code is tested against a scripted fake gateway, not yet against a live paper session.** Symbols and multipliers in [`futures_map.csv`](src/quant_risk/ibkr/futures_map.csv) are checked against IBKR on every run and any mismatch stops that instrument, but run `--dry-run` once on your own Gateway first.
+- An educational project, not investment advice. Live trading is not supported: only paper ports are accepted.
 
 ---
 
@@ -235,6 +251,6 @@ data/, var/       market data and paper-trading journal, local only (git-ignored
 
 I'm **Claire Giuffra Contri**, an MSc Finance student at HKUST (Financial Analysis and Investment Management), on a risk-management exchange at Bocconi, focusing on market and climate risk. Before this I worked on sustainable investment and risk at SCOR, and on green-finance policy at the European Chamber of Commerce in Hong Kong.
 
-This repository is my own rebuild of the risk layer of the **BSQF "Python-integrated IBKR Account for Algo Trading"** project, where I was a Quantitative Risk Management Analyst. The time-series momentum and multi-horizon trend strategies are my contributions to that project, rebuilt here for futures: long and short, and measured on price differences. Thanks to the BSQF project team.
+This repository is my own rebuild of the risk layer of the **BSQF "Python-integrated IBKR Account for Algo Trading"** project, where I was a Quantitative Risk Management Analyst. The time-series momentum and multi-horizon trend strategies are my contributions to that project, rebuilt here for futures: long and short, and measured on price differences. The IBKR connection code (client, contract qualification, backward history walk) is adapted from that project, used with its authors' permission. Thanks to the BSQF project team.
 
 [LinkedIn](https://www.linkedin.com/in/claire-g-a0408119b/) · [GitHub](https://github.com/Claerys)

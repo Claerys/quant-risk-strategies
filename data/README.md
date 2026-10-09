@@ -36,3 +36,16 @@ contract rolls do not appear as jumps, which can push them below zero (crude oil
 gasoline, soybeans, soybean meal). Price differences are preserved by the adjustment; ratios are
 not. Risk in this project is therefore measured on daily P&L per contract
 (price change x multiplier), never on percentage returns of these prices.
+
+**From Interactive Brokers** (IB Gateway or TWS, paper account, API socket enabled):
+
+```bash
+pip install -e ".[ibkr]"
+python scripts/download_ibkr.py --dry-run          # qualify contracts, write nothing
+python scripts/download_ibkr.py --symbols ES CL --years 10 --fx
+```
+
+Every listed and expired contract month is fetched, chained into one back-adjusted series and written to
+`data/daily/<SYMBOL>.parquet`. A later run fetches only the newest months, reconciles them against the
+file already on disk and refuses to write if the two disagree. Nothing is written if the result fails
+the data-quality checks.

@@ -64,11 +64,11 @@ def root_key(instrument: Instrument, *, include_expired: bool = False) -> Contra
                        include_expired=include_expired)
 
 
-def futures_chain(client, instrument: Instrument) -> list[ContractMonth]:
-    """Every listed and expired month of the instrument, oldest first. Raises on anything odd."""
+def futures_chain(client, instrument: Instrument, *, include_expired: bool = True) -> list[ContractMonth]:
+    """Every listed (and by default expired) month of the instrument, oldest first. Raises on anything odd."""
     mapping = futures_map_for(instrument)
     months: list[ContractMonth] = []
-    for found in client.candidates(root_key(instrument, include_expired=True)):
+    for found in client.candidates(root_key(instrument, include_expired=include_expired)):
         key = found.key
         label = f"{instrument.symbol} {key.local_symbol or key.expiry}"
         if key.currency != instrument.currency:
